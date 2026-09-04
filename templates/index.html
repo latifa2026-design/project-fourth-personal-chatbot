@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat with {{ person_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>💬 {{ person_name }}</h1>
+      <p class="subtitle">Ask me anything about myself — I'll answer only from what I know.</p>
+    </header>
+
+    <main id="messages" aria-live="polite">
+      <div class="message bot">
+        <span class="bubble">Hi! I'm {{ person_name }}. Ask me a question and I'll do my best to answer.</span>
+      </div>
+    </main>
+
+    <form id="chat-form" autocomplete="off">
+      <input id="input" type="text" placeholder="Type your message…" maxlength="4000" autofocus />
+      <button id="send" type="submit">Send</button>
+      <p id="error" class="error" hidden></p>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const messagesEl = document.getElementById('messages');
+    const errorEl = document.getElementById('error');
+
+    // Local history of this session, sent to the server so the bot keeps context.
+    const history = [];
+
+    function addMessage(role, text) {
+      const wrap = document.createElement('div');
+      wrap.className = 'message ' + (role === 'user' ? 'user' : 'bot');
+      const bubble = document.createElement('span');
+      bubble.className = 'bubble';
+      bubble.textContent = text; // textContent keeps rendering safe
+      wrap.appendChild(bubble);
+      messagesEl.appendChild(wrap);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return bubble;
+    }
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.hidden = !msg;
+    }
+
+    async function send() {
+      const message = input.value.trim();
+      if (!message || sendBtn.disabled) return;
+
+      showError('');
+      input.value = '';
+      addMessage('user', message);
+      history.push({ role: 'user', content: message });
+
+      // Show a "typing..." indicator
+      const typing = document.createElement('div');
+      typing.className = 'message bot';
+      typing.innerHTML = '<span class="bubble typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
+      messagesEl.appendChild(typing);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      sendBtn.disabled = true;
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: message, history: history })
+        });
+        const data = await res.json();
+        typing.remove();
+
+        if (!res.ok) {
+          showError(data.error || 'Something went wrong.');
+          return;
+        }
+        addMessage('bot', data.reply);
+        history.push({ role: 'assistant', content: data.reply });
+      } catch (e) {
+        typing.remove();
+        showError('Could not reach the server.');
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    form.addEventListener('submit', (e) => { e.preventDefault(); send(); });
+  </script>
+</body>
+</html>

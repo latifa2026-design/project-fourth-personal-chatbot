@@ -108,5 +108,7 @@ def chat():
 
 
 if __name__ == "__main__":
-    # debug=True gives auto-reload while developing. Set debug=False for production.
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    # Port comes from Render's $PORT env var when deployed; default to 5000 locally.
+    port = int(os.environ.get("PORT", "5000"))
+    # On Render the app must listen on 0.0.0.0; locally this is also fine.
+    app.run(host="0.0.0.0", port=port, debug=True)
